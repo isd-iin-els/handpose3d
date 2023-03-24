@@ -9,15 +9,65 @@ import paho.mqtt.client as mqtt
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
-frame_shape = [600, 800]
+frame_shape = [900, 1500]
 
 client = mqtt.Client("3dHandTracking")    # Identificacao do Cliente
 # client.username_pw_set(username="minibike",password="minibike2021")     # Usuario e senha do broker
 client.connect('10.1.1.243',1883)
 
-def fingerMqttSend(frame_p3ds,fingerIndex,poseIndex):
-    y1 = 1.*math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14+45
-    client.publish("3dHandPose"+str(poseIndex),str(0)+','+str(0)+','+str(-y1))
+def fingerMqttSend(fingerName,frame_p3ds,fingerIndex,poseIndex,hand):
+    if hand == 'r':
+        y1 = math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14+50
+    elif hand == 'l':
+        y1 = -math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14-50
+
+    client.publish(hand+fingerName+str(poseIndex),str(0)+','+str(0)+','+str(-y1))
+
+def handPositionMqttSend(frame_p3ds,hand):
+    tempStr = ""
+    if hand == 'r':
+        for j,item in enumerate(frame_p3ds[0]):
+            if j<2:
+                tempStr = tempStr + str(-0.5*float(item)) + ','
+            else:
+                tempStr = tempStr + str(-0.5*float(item))
+    elif hand == 'l':
+        for j,item in enumerate(frame_p3ds[0]):
+            if j<2:
+                tempStr = tempStr + str(-0.5*float(item)) + ','
+            else:
+                tempStr = tempStr + str(-0.5*float(item))
+
+    client.publish(hand+"3dHandPosition",tempStr)
+
+def handOrientationMqttSend(frame_p3ds,hand):
+    y1 = -1.5*math.atan2(frame_p3ds[17][0]-frame_p3ds[0][0],((frame_p3ds[17][2]-frame_p3ds[0][2])**2+(frame_p3ds[17][1]-frame_p3ds[0][1])**2)**0.5)*180/3.14-115
+    x1 = math.atan2(frame_p3ds[1][2]-frame_p3ds[0][2],((frame_p3ds[1][0]-frame_p3ds[0][0])**2+(frame_p3ds[1][1]-frame_p3ds[0][1])**2)**0.5)*180/3.14
+    client.publish(hand+"3dHandOrientation",str(x1)+','+str(0)+',0')
+
+def sendHandMqttData(frame_p3ds,hand):
+    handPositionMqttSend(frame_p3ds,hand)
+    handOrientationMqttSend(frame_p3ds,hand)
+
+    fingerMqttSend('thumb',frame_p3ds,1,1,hand)
+    fingerMqttSend('thumb',frame_p3ds,2,2,hand)
+    fingerMqttSend('thumb',frame_p3ds,3,3,hand)
+
+    fingerMqttSend('index',frame_p3ds,5,1,hand)
+    fingerMqttSend('index',frame_p3ds,6,2,hand)
+    fingerMqttSend('index',frame_p3ds,7,3,hand)
+
+    fingerMqttSend('middle',frame_p3ds,9,1,hand)
+    fingerMqttSend('middle',frame_p3ds,10,2,hand)
+    fingerMqttSend('middle',frame_p3ds,11,3,hand)
+
+    fingerMqttSend('ring',frame_p3ds,13,1,hand)
+    fingerMqttSend('ring',frame_p3ds,14,2,hand)
+    fingerMqttSend('ring',frame_p3ds,15,3,hand)
+
+    fingerMqttSend('pinkie',frame_p3ds,17,1,hand)
+    fingerMqttSend('pinkie',frame_p3ds,18,2,hand)
+    fingerMqttSend('pinkie',frame_p3ds,19,3,hand)
 
 def run_mp(input_stream1, input_stream2, P0, P1):
     #input video stream
@@ -31,8 +81,8 @@ def run_mp(input_stream1, input_stream2, P0, P1):
         cap.set(4, frame_shape[0])
 
     #create hand keypoints detector object.
-    hands0 = mp_hands.Hands(min_detection_confidence=0.5, max_num_hands =1, min_tracking_confidence=0.5)
-    hands1 = mp_hands.Hands(min_detection_confidence=0.5, max_num_hands =1, min_tracking_confidence=0.5)
+    hands0 = mp_hands.Hands(min_detection_confidence=0.5, max_num_hands =2, min_tracking_confidence=0.5)
+    hands1 = mp_hands.Hands(min_detection_confidence=0.5, max_num_hands =2, min_tracking_confidence=0.5)
 
     #containers for detected keypoints for each camera
     kpts_cam0 = []
@@ -114,26 +164,17 @@ def run_mp(input_stream1, input_stream2, P0, P1):
         This contains the 3d position of each keypoint in current frame.
         For real time application, this is what you want.
         '''
-        frame_p3ds = np.array(frame_p3ds).reshape((21, 3))
+        #a = frame_p3ds[0:21]
+        frame_p3ds1 = []
+        if len(frame_p3ds) == 21:
+            frame_p3ds = np.array(frame_p3ds[0:21]).reshape((21, 3))
+        else:
+            frame_p3ds1 = np.array(frame_p3ds[21:]).reshape((21, 3))
+            frame_p3ds = np.array(frame_p3ds[0:21]).reshape((21, 3))
+       
         global _kpts_3d
-        # visualize_3d(_kpts_3d,frame_p3ds)
-        
-        tempStr = ""
-        for j,item in enumerate(frame_p3ds[0]):
-            if j<2:
-                tempStr = tempStr + str(float(item)) + ','
-            else:
-                tempStr = tempStr + str(float(item))
-
-        client.publish("3dHandPose"+str(0),tempStr)
-
-        y1 = -1.5*math.atan2(frame_p3ds[17][0]-frame_p3ds[0][0],((frame_p3ds[17][2]-frame_p3ds[0][2])**2+(frame_p3ds[17][1]-frame_p3ds[0][1])**2)**0.5)*180/3.14-115
-        x1 = 1.7*math.atan2(frame_p3ds[1][2]-frame_p3ds[0][2],((frame_p3ds[1][0]-frame_p3ds[0][0])**2+(frame_p3ds[1][1]-frame_p3ds[0][1])**2)**0.5)*180/3.14-90
-        client.publish("3dHandPose"+str(1),str(x1)+','+str(y1)+',0')
-
-        fingerMqttSend(frame_p3ds,5,2)
-        fingerMqttSend(frame_p3ds,6,3)
-        fingerMqttSend(frame_p3ds,7,4)
+        sendHandMqttData(frame_p3ds,'r')
+        if len(frame_p3ds1) > 1: sendHandMqttData(frame_p3ds1,'l')
 
 
         time.sleep(0.05)
