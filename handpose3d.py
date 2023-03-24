@@ -1,13 +1,23 @@
 import cv2 as cv
 import mediapipe as mp
 import numpy as np
-import sys
-from utils import DLT, get_projection_matrix, write_keypoints_to_disk
+import sys,json,time,math
+from utils import DLT, get_projection_matrix
+import matplotlib.pyplot as plt
+import paho.mqtt.client as mqtt
 
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
 
-frame_shape = [720, 1280]
+frame_shape = [600, 800]
+
+client = mqtt.Client("3dHandTracking")    # Identificacao do Cliente
+# client.username_pw_set(username="minibike",password="minibike2021")     # Usuario e senha do broker
+client.connect('10.1.1.243',1883)
+
+def fingerMqttSend(frame_p3ds,fingerIndex,poseIndex):
+    y1 = 1.*math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14+45
+    client.publish("3dHandPose"+str(poseIndex),str(0)+','+str(0)+','+str(-y1))
 
 def run_mp(input_stream1, input_stream2, P0, P1):
     #input video stream
@@ -105,8 +115,37 @@ def run_mp(input_stream1, input_stream2, P0, P1):
         For real time application, this is what you want.
         '''
         frame_p3ds = np.array(frame_p3ds).reshape((21, 3))
-        kpts_3d.append(frame_p3ds)
+        global _kpts_3d
+        # visualize_3d(_kpts_3d,frame_p3ds)
+        
+        tempStr = ""
+        for j,item in enumerate(frame_p3ds[0]):
+            if j<2:
+                tempStr = tempStr + str(float(item)) + ','
+            else:
+                tempStr = tempStr + str(float(item))
 
+        client.publish("3dHandPose"+str(0),tempStr)
+
+        y1 = -1.5*math.atan2(frame_p3ds[17][0]-frame_p3ds[0][0],((frame_p3ds[17][2]-frame_p3ds[0][2])**2+(frame_p3ds[17][1]-frame_p3ds[0][1])**2)**0.5)*180/3.14-115
+        x1 = 1.7*math.atan2(frame_p3ds[1][2]-frame_p3ds[0][2],((frame_p3ds[1][0]-frame_p3ds[0][0])**2+(frame_p3ds[1][1]-frame_p3ds[0][1])**2)**0.5)*180/3.14-90
+        client.publish("3dHandPose"+str(1),str(x1)+','+str(y1)+',0')
+
+        fingerMqttSend(frame_p3ds,5,2)
+        fingerMqttSend(frame_p3ds,6,3)
+        fingerMqttSend(frame_p3ds,7,4)
+
+
+        time.sleep(0.05)
+        _kpts_3d = frame_p3ds
+
+        kpts_3d.append(frame_p3ds)
+        # print(kpts_3d)
+        # if len(_kpts_3d) == 2:
+        #     _kpts_3d.remove(0)
+        # _kpts_3d.append(kpts_3d)
+
+        
         # Draw the hand annotations on the image.
         frame0.flags.writeable = True
         frame1.flags.writeable = True
@@ -135,8 +174,8 @@ def run_mp(input_stream1, input_stream2, P0, P1):
 
 if __name__ == '__main__':
 
-    input_stream1 = 'media/cam0_test.mp4'
-    input_stream2 = 'media/cam1_test.mp4'
+    input_stream1 = '/dev/video0'#'media/cam0_test.mp4'
+    input_stream2 = '/dev/video2'#'media/cam1_test.mp4'
 
     if len(sys.argv) == 3:
         input_stream1 = int(sys.argv[1])

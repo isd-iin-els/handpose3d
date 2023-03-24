@@ -1,5 +1,11 @@
 import numpy as np
 
+Rz = np.array(([[0., -1., 0.],
+                [1.,  0., 0.],
+                [0.,  0., 1.]]))
+Rx = np.array(([[1.,  0.,  0.],
+                [0., -1.,  0.],
+                [0.,  0., -1.]]))
 
 def _make_homogeneous_rep_matrix(R, t):
     P = np.zeros((4,4))
