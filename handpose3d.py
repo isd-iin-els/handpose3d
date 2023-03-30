@@ -16,58 +16,69 @@ client = mqtt.Client("3dHandTracking")    # Identificacao do Cliente
 client.connect('10.1.1.243',1883)
 
 def fingerMqttSend(fingerName,frame_p3ds,fingerIndex,poseIndex,hand):
-    if hand == 'r':
-        y1 = math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14+50
-    elif hand == 'l':
-        y1 = -math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14-50
+    # if hand == 'r':
+    #     y1 = math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14+60
+    # elif hand == 'l':
+    #     y1 = -math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14-60
+    points = np.asarray([frame_p3ds[0], frame_p3ds[fingerIndex], frame_p3ds[fingerIndex+1]])
+    normal_vector = np.cross(points[2] - points[0], points[1] - points[2])
+    if np.linalg.norm(normal_vector) != 0:
+        normal_vector /= np.linalg.norm(normal_vector)
+    if hand == 'l':
+        normal_vector = 90*normal_vector+60
+    else:
+        normal_vector = 90*normal_vector-60
 
-    client.publish(hand+fingerName+str(poseIndex),str(0)+','+str(0)+','+str(-y1))
+    client.publish(hand+fingerName+str(poseIndex),str(0)+','+str(0)+','+str(normal_vector[2]))
 
-def handPositionMqttSend(frame_p3ds,hand):
+def handPositionMqttSend(frame_p2ds,hand):
     tempStr = ""
     if hand == 'r':
-        for j,item in enumerate(frame_p3ds[0]):
-            if j<2:
-                tempStr = tempStr + str(-0.5*float(item)) + ','
+        for j,item in enumerate(frame_p2ds[0]):
+            if j<1:
+                tempStr = tempStr + str(0.001*(float(item))) + ','
             else:
-                tempStr = tempStr + str(-0.5*float(item))
+                tempStr = tempStr + str(-0.001*(float(item)))
     elif hand == 'l':
-        for j,item in enumerate(frame_p3ds[0]):
-            if j<2:
-                tempStr = tempStr + str(-0.5*float(item)) + ','
+        for j,item in enumerate(frame_p2ds[0]):
+            if j<1:
+                tempStr = tempStr + str(-0.003*(float(item))) + ','
             else:
-                tempStr = tempStr + str(-0.5*float(item))
+                tempStr = tempStr + str(-0.003*(float(item)))
 
-    client.publish(hand+"3dHandPosition",tempStr)
+    client.publish(hand+"3dHandPosition",tempStr+',0.0')
 
 def handOrientationMqttSend(frame_p3ds,hand):
-    y1 = -1.5*math.atan2(frame_p3ds[17][0]-frame_p3ds[0][0],((frame_p3ds[17][2]-frame_p3ds[0][2])**2+(frame_p3ds[17][1]-frame_p3ds[0][1])**2)**0.5)*180/3.14-115
-    x1 = math.atan2(frame_p3ds[1][2]-frame_p3ds[0][2],((frame_p3ds[1][0]-frame_p3ds[0][0])**2+(frame_p3ds[1][1]-frame_p3ds[0][1])**2)**0.5)*180/3.14
-    client.publish(hand+"3dHandOrientation",str(x1)+','+str(0)+',0')
+    points = np.asarray([frame_p3ds[0], frame_p3ds[5], frame_p3ds[17]])
+    normal_vector = np.cross(points[2] - points[0], points[1] - points[2])
+    if np.linalg.norm(normal_vector) != 0:
+        normal_vector /= np.linalg.norm(normal_vector)
+    normal_vector = 90*normal_vector
+    client.publish(hand+"3dHandOrientation",str(normal_vector[0])+','+str(0)+','+str(0))
 
-def sendHandMqttData(frame_p3ds,hand):
-    handPositionMqttSend(frame_p3ds,hand)
-    handOrientationMqttSend(frame_p3ds,hand)
+def sendHandMqttData(points2D,frame_p3ds,hand):
+    handPositionMqttSend(points2D,hand[0])
+    handOrientationMqttSend(frame_p3ds,hand[0])
 
-    fingerMqttSend('thumb',frame_p3ds,1,1,hand)
-    fingerMqttSend('thumb',frame_p3ds,2,2,hand)
-    fingerMqttSend('thumb',frame_p3ds,3,3,hand)
+    fingerMqttSend('thumb',frame_p3ds,1,1,hand[1])
+    fingerMqttSend('thumb',frame_p3ds,2,2,hand[1])
+    fingerMqttSend('thumb',frame_p3ds,3,3,hand[1])
 
-    fingerMqttSend('index',frame_p3ds,5,1,hand)
-    fingerMqttSend('index',frame_p3ds,6,2,hand)
-    fingerMqttSend('index',frame_p3ds,7,3,hand)
+    fingerMqttSend('index',frame_p3ds,5,1,hand[1])
+    fingerMqttSend('index',frame_p3ds,6,2,hand[1])
+    fingerMqttSend('index',frame_p3ds,7,3,hand[1])
 
-    fingerMqttSend('middle',frame_p3ds,9,1,hand)
-    fingerMqttSend('middle',frame_p3ds,10,2,hand)
-    fingerMqttSend('middle',frame_p3ds,11,3,hand)
+    fingerMqttSend('middle',frame_p3ds,9,1,hand[1])
+    fingerMqttSend('middle',frame_p3ds,10,2,hand[1])
+    fingerMqttSend('middle',frame_p3ds,11,3,hand[1])
 
-    fingerMqttSend('ring',frame_p3ds,13,1,hand)
-    fingerMqttSend('ring',frame_p3ds,14,2,hand)
-    fingerMqttSend('ring',frame_p3ds,15,3,hand)
+    fingerMqttSend('ring',frame_p3ds,13,1,hand[1])
+    fingerMqttSend('ring',frame_p3ds,14,2,hand[1])
+    fingerMqttSend('ring',frame_p3ds,15,3,hand[1])
 
-    fingerMqttSend('pinkie',frame_p3ds,17,1,hand)
-    fingerMqttSend('pinkie',frame_p3ds,18,2,hand)
-    fingerMqttSend('pinkie',frame_p3ds,19,3,hand)
+    fingerMqttSend('pinkie',frame_p3ds,17,1,hand[1])
+    fingerMqttSend('pinkie',frame_p3ds,18,2,hand[1])
+    fingerMqttSend('pinkie',frame_p3ds,19,3,hand[1])
 
 def run_mp(input_stream1, input_stream2, P0, P1):
     #input video stream
@@ -115,10 +126,23 @@ def run_mp(input_stream1, input_stream2, P0, P1):
 
         #prepare list of hand keypoints of this frame
         #frame0 kpts
+        hand = []
+        if results0.multi_handedness != None:
+            if results0.multi_handedness[0].classification[0].label[0] == 'L':
+                hand.append('r')
+                hand.append('l')
+            elif results0.multi_handedness[0].classification[0].label[0] == 'R':
+                hand.append('l')
+                hand.append('r')
+        else:
+            hand.append('r')
+            hand.append('l')
+
         frame0_keypoints = []
         if results0.multi_hand_landmarks:
             for hand_landmarks in results0.multi_hand_landmarks:
                 for p in range(21):
+                    #print(results0.multi_handedness[0])
                     #print(p, ':', hand_landmarks.landmark[p].x, hand_landmarks.landmark[p].y)
                     pxl_x = int(round(frame0.shape[1]*hand_landmarks.landmark[p].x))
                     pxl_y = int(round(frame0.shape[0]*hand_landmarks.landmark[p].y))
@@ -130,6 +154,7 @@ def run_mp(input_stream1, input_stream2, P0, P1):
             #if no keypoints are found, simply fill the frame data with [-1,-1] for each kpt
             frame0_keypoints = [[-1, -1]]*21
 
+        points2D = frame0_keypoints
         kpts_cam0.append(frame0_keypoints)
 
         #frame1 kpts
@@ -173,11 +198,14 @@ def run_mp(input_stream1, input_stream2, P0, P1):
             frame_p3ds = np.array(frame_p3ds[0:21]).reshape((21, 3))
        
         global _kpts_3d
-        sendHandMqttData(frame_p3ds,'r')
-        if len(frame_p3ds1) > 1: sendHandMqttData(frame_p3ds1,'l')
+        
+        if len(frame_p3ds1) > 1 and len(hand) == 2: 
+            sendHandMqttData(points2D[0:21],frame_p3ds1,hand)
+            sendHandMqttData(points2D[21:],frame_p3ds,[hand[1],hand[0]])
+        
 
 
-        time.sleep(0.05)
+        # time.sleep(0.05)
         _kpts_3d = frame_p3ds
 
         kpts_3d.append(frame_p3ds)
