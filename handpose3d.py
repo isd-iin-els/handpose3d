@@ -11,15 +11,10 @@ mp_hands = mp.solutions.hands
 
 frame_shape = [900, 1500]
 
-client = mqtt.Client("3dHandTracking")    # Identificacao do Cliente
-# client.username_pw_set(username="minibike",password="minibike2021")     # Usuario e senha do broker
+client = mqtt.Client("3dHandTracking")    
 client.connect('10.1.1.243',1883)
 
 def fingerMqttSend(fingerName,frame_p3ds,fingerIndex,poseIndex,hand):
-    # if hand == 'r':
-    #     y1 = math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14+60
-    # elif hand == 'l':
-    #     y1 = -math.atan2(frame_p3ds[fingerIndex+1][2]-frame_p3ds[fingerIndex][2],((frame_p3ds[fingerIndex+1][0]-frame_p3ds[fingerIndex][0])**2+(frame_p3ds[fingerIndex+1][1]-frame_p3ds[fingerIndex][1])**2)**0.5)*180/3.14-60
     points = np.asarray([frame_p3ds[0], frame_p3ds[fingerIndex], frame_p3ds[fingerIndex+1]])
     normal_vector = np.cross(points[2] - points[0], points[1] - points[2])
     if np.linalg.norm(normal_vector) != 0:
